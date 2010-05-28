@@ -41,6 +41,9 @@ def search(collection, search_query_string):
     """
     Re-implmentation of JS function search.mapReduceSearch
     """
+    #TODO: add in a spec param here - we may as well pre-filter this search too
+    # this means we can also then sort the output and just use relevant ones later
+    # when we have to do limit etc.
     search_query_terms = process_query_string(search_query_string)
     map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
     reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
@@ -111,7 +114,7 @@ def tokenize(phrase):
 def index_name(collection):
     return INDEX_NAMESPACE + '.' + collection.name
     
-class TextIndexedCollection(object):
+class SearchableCollection(object):
     """
     Wrap a pymongo.collections.Collection and provide full-text search functions
     """
@@ -191,11 +194,11 @@ class SearchCursor(object):
         reduce_js = Code("function(k, v) { return mft.get('search')._niceSearchReduce(k, v) }")
         scope =  {'coll_name': self.collection.name}
         db = self.collection.database
-        sorting = {'value.score': pymongo.DESCENDING}
+        # sorting = [('value.score', pymongo.DESCENDING)]    #Seems to not make any difference?
         id_list = self.id_list()
         id_query_obj = {} if id_list is None else {'_id': {'$in': id_list}}
         self._actual_result_cursor = db[search_coll_name].map_reduce(map_js, reduce_js, 
-            query=id_query_obj, scope=scope, sort=sorting).find()
+            query=id_query_obj, scope=scope).find()
         self._actual_result_cursor.sort([('value.score', pymongo.DESCENDING)])
         if self._limit is not None: #optimise the hell out of this later maybe?
             self._actual_result_cursor.limit(self._limit)
