@@ -26,8 +26,6 @@ import porter
 TOKENIZE_BASIC_RE = re.compile(r"\b(\w[\w'-]*\w|\w)\b") #this should match the RE in use on the server
 INDEX_NAMESPACE = 'search_.indexes'
 
-
-
 def index_collection(collection):
     """Execute all relevant bulk indexing functions
     ie:
@@ -109,3 +107,18 @@ def tokenize(phrase):
 
 def index_name(collection):
     return INDEX_NAMESPACE + '.' + collection.name
+    
+class TextIndexedCollection(object):
+    """
+    Wrap a pymongo.collections.Collection and provide full-text search functions
+    """
+    def __init__(self, collection, *args, **kwargs):
+        self.collection = collection
+    def __getattr__(self, att):
+        return getattr(self.collection, att)
+    nice_search = nice_search
+    index_collection = index_collection
+    search = search
+    nice_search_by_query = nice_search_by_query
+    nice_search_by_ids = nice_search_by_ids
+    

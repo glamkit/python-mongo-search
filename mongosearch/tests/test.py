@@ -109,7 +109,40 @@ def test_simple_search():
       [{u'_id': 1.0, u'value': {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish'}},
        {u'_id': 3.0, u'value': {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish'}}]
     )
-    # assert len(results) == 1
+
+def test_oo_search():
+    collection = mongo_search.TextIndexedCollection(
+      _database['oo_search_works']
+    )
+    collection.remove()
+    stdout, stderr = util.load_fixture('jstests/_fixture-basic.json', collection)
+    conf = _database['fulltext_config']
+    conf.remove()
+    conf.insert({
+      'collection_name' : 'oo_search_works',
+      'fields': {
+        'title': 5, 'content': 1},
+      'params': {
+        'full_vector_norm': True}
+    })
+
+    stdout, stderr = collection.ensure_text_index()
+
+    results = collection.search(u'fish')
+
+    assert_equals(
+      list(results.find()),
+      [{u'_id': 1.0, u'value': 0.72150482058559517},
+       {u'_id': 3.0, u'value': 0.32510310522208458}]
+    )
+
+    nice_results = collection.nice_search(u'fish')
+
+    assert_equals(
+      list(nice_results),
+      [{u'_id': 1.0, u'value': {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish'}},
+       {u'_id': 3.0, u'value': {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish'}}]
+    )
 
 # def test_stemming():
 #     analyze = whoosh_searching.search_engine().index.schema.analyzer('content')
