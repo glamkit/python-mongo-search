@@ -92,7 +92,7 @@ def test_simple_search():
         'full_vector_norm': True}
     })
     
-    stdout, stderr = mongo_search.index_collection(collection)
+    stdout, stderr = mongo_search.ensure_text_index(collection)
     
     results = mongo_search.search(collection, u'fish')
 
