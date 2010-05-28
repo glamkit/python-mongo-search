@@ -7,6 +7,7 @@ from nose import with_setup
 from nose.tools import assert_true, assert_equals, assert_raises
 from mongosearch import mongo_search, util
 import time
+import sys
 
 _daemon = None
 _settings = {
@@ -94,11 +95,20 @@ def test_simple_search():
     stdout, stderr = mongo_search.index_collection(collection)
     
     results = mongo_search.search(collection, u'fish')
-    print results
-    print list(results.find())
+
+    assert_equals(
+      list(results.find()),
+      [{u'_id': 1.0, u'value': 0.72150482058559517},
+       {u'_id': 3.0, u'value': 0.32510310522208458}]
+    )
     
     nice_results = mongo_search.nice_search(collection, u'fish')
-    print list(nice_results)
+
+    assert_equals(
+      list(nice_results),
+      [{u'_id': 1.0, u'value': {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish'}},
+       {u'_id': 3.0, u'value': {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish'}}]
+    )
     # assert len(results) == 1
 
 # def test_stemming():
