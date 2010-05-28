@@ -26,7 +26,7 @@ import porter
 TOKENIZE_BASIC_RE = re.compile(r"\b(\w[\w'-]*\w|\w)\b") #this should match the RE in use on the server
 INDEX_NAMESPACE = 'search_.indexes'
 
-def index_collection(collection):
+def ensure_text_index(collection):
     """Execute all relevant bulk indexing functions
     ie:
         mapReduceIndex , which extracts indexed terms and puts them in a new collection
@@ -117,7 +117,7 @@ class TextIndexedCollection(object):
     def __getattr__(self, att):
         return getattr(self.collection, att)
     nice_search = nice_search
-    index_collection = index_collection
+    ensure_text_index = ensure_text_index
     search = search
     nice_search_by_query = nice_search_by_query
     nice_search_by_ids = nice_search_by_ids
