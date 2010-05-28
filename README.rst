@@ -19,6 +19,6 @@ Help and development
 
 If you'd like to help out, you can fork the project
 at http://github.com/glamkit/mongo-full-text-search and report any bugs 
-at http://github.com/glamkit/mongo-full-text-search/issues.
+at https://www.assembla.com/spaces/python-mongo-search
 
 
