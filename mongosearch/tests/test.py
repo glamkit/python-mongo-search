@@ -5,7 +5,7 @@ actual tests for the mongo-full-text-search
 
 from nose import with_setup
 from nose.tools import assert_true, assert_equals, assert_raises
-from mongofulltextsearch import mongo_search, util
+from mongosearch import mongo_search, util
 import time
 
 _daemon = None

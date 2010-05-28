@@ -5,7 +5,7 @@ from paver import setuputils
 from setuptools import find_packages
 from paver.setuputils import setup
 
-PROJECT = 'mongofulltextsearch'
+PROJECT = 'mongosearch'
 
 try:
     # Optional tasks, only needed for development
@@ -64,10 +64,10 @@ setup(
     keywords='fulltextsearch search mongodb javascript',
     author='Andy and Dan MacKinlay',
     author_email='fillmewithspam@email.possumpalace.org',
-    url='http://github.com/howthebodyworks/mongo-full-text-search/',
+    url='http://www.assembla.com/spaces/python-mongo-search',
     license='BSD',
     packages = find_packages(exclude=['bootstrap', 'pavement',]),
-    package_dir = {'mongofulltextsearch': 'mongofulltextsearch'},
+    package_dir = {'mongosearch': 'mongosearch'},
     include_package_data=True,
     package_data=PACKAGE_DATA,
     test_suite='nose.collector',

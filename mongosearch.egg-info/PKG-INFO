@@ -1,8 +1,8 @@
 Metadata-Version: 1.0
-Name: mongofulltextsearch
+Name: mongosearch
 Version: 0.1-alpha
 Summary: Full text search for mongo in javascript, with python client driver
-Home-page: http://github.com/howthebodyworks/mongo-full-text-search/
+Home-page: http://www.assembla.com/spaces/python-mongo-search
 Author: Andy and Dan MacKinlay
 Author-email: fillmewithspam@email.possumpalace.org
 License: BSD
