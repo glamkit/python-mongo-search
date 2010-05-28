@@ -1,6 +1,3 @@
-[submodule "mongofulltextsearch/javascript"]
-	path = mongosearch/javascript
-	url = git@github.com:glamkit/mongo-search.git
 [submodule "mongosearch/javascript"]
 	path = mongosearch/javascript
 	url = git@github.com:glamkit/mongo-search.git
