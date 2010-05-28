@@ -106,12 +106,12 @@ def test_simple_search():
 
     assert_equals(
       list(nice_results),
-      [{u'_id': 1.0, u'value': {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish'}},
-       {u'_id': 3.0, u'value': {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish'}}]
+      [{u'_id': 1.0, u'value': {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish', u'category': u'A' }},
+       {u'_id': 3.0, u'value': {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish', u'category': u'B' }}]
     )
 
 def test_oo_search():
-    collection = mongo_search.TextIndexedCollection(
+    collection = mongo_search.SearchableCollection(
       _database['oo_search_works']
     )
     collection.remove()
@@ -128,21 +128,21 @@ def test_oo_search():
 
     stdout, stderr = collection.ensure_text_index()
 
-    results = collection.search(u'fish')
+    results = collection._search(u'fish')
 
     assert_equals(
       list(results.find()),
-      [{u'_id': 1.0, u'value': 0.72150482058559517},
-       {u'_id': 3.0, u'value': 0.32510310522208458}]
+      [{u'_id': 1, u'value': 0.72150482058559517},
+       {u'_id': 3, u'value': 0.32510310522208458}]
     )
-
-    nice_results = collection.nice_search(u'fish')
-
-    assert_equals(
-      list(nice_results),
-      [{u'_id': 1.0, u'value': {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish'}},
-       {u'_id': 3.0, u'value': {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish'}}]
-    )
+ 
+    cursor_results = list(collection.search(u'fish'))
+    
+    assert_equals(cursor_results, [
+        {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish', u'category': u'A' },
+        {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish', u'category': u'B' }])
+        
+        
 
 # def test_stemming():
 #     analyze = whoosh_searching.search_engine().index.schema.analyzer('content')
