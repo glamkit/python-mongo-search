@@ -124,22 +124,18 @@ class SearchableCollection(object):
         return getattr(self.collection, att)
 
     ensure_text_index = ensure_text_index
-    _search = search
     
-    def search_by_ids(self, search_query_string, id_list, limit=None, skip=None):
-        return SearchCursor(self, search_query_string, id_list=id_list, limit=limit, skip=skip)
-    
-    def search_by_query(self, search_query_string, spec, limit=None, skip=None):
-        return SearchCursor(self, search_query_string, spec=spec, limit=limit, skip=skip)
-    
-    def search(self, search_query_string, limit=None, skip=None):
-        return SearchCursor(self, search_query_string, limit=limit, skip=skip)
+    def search(self, search_query_string, spec=None, id_list=None, limit=None, skip=None):
+        return SearchCursor(self, search_query_string, spec=spec, id_list=id_list, limit=limit, skip=skip)
 
 
 class SearchCursor(object):
-    def __init__(self, collection, search_query_string, id_list=None, spec=None, limit=None, skip=None):
+    def __init__(self, collection, search_query_string, id_list=None, spec=None, limit=0, skip=0):
+        if id_list and spec:
+            raise InvalidSearchOperation("Can't set id_list and spec at the same time")
         self.collection = collection
         self.search_query_string = search_query_string
+        self.search_query_terms = process_query_string(self.search_query_string)
         self._id_list = id_list
         self._spec = spec
         self._actual_result_cursor = None
@@ -166,7 +162,7 @@ class SearchCursor(object):
     def limit(self, limit):
         # could do much optimising here
         if self._actual_result_cursor is not None:
-            raise InvalidOperation("Cannot set search options after executing SearchQuery")
+            raise InvalidSearchOperation("Cannot set search options after executing SearchQuery")
         self._limit = limit
         return self
     
@@ -183,35 +179,57 @@ class SearchCursor(object):
             db = self.collection.database
             index_coll = db[index_name(self.collection)]
             #shoudl refactor this by moving search() inside this cursor, so we can cache this stuff
-            return index_coll.find(_query_obj_for_terms(process_query_string(search_query_string))).count()
+            return index_coll.find(_query_obj_for_terms(self.search_query_terms)).count()
         else:
             return self._actual_result_cursor.count()
     
     def _perform_search(self):
-        raw_search_results = self.collection._search(self.search_query_string)
-        search_coll_name = raw_search_results.name
+        self._raw_search()
+        search_coll_name = self._raw_result_coll.name
         map_js = Code("function() { mft.get('search')._niceSearchMap.call(this) }")
         reduce_js = Code("function(k, v) { return mft.get('search')._niceSearchReduce(k, v) }")
         scope =  {'coll_name': self.collection.name}
         db = self.collection.database
         # sorting = [('value.score', pymongo.DESCENDING)]    #Seems to not make any difference?
-        id_list = self.id_list()
-        id_query_obj = {} if id_list is None else {'_id': {'$in': id_list}}
+        if self._limit or self._skip: 
+            # avoid instantiating extra objects by sorting on the raw resutls first
+            # so if only need 20 actual objects, we can get them only
+            raw_result_cursor = self._raw_result_coll.find(fields=['_id']).sort(
+              [('value.score', pymongo.DESCENDING)])
+            if self._limit:
+                raw_result_cursor.limit(self._limit)
+            if self._skip:
+                raw_result_cursor.skip(self._skip)
+            id_list = [rec['_id'] for rec in raw_result_cursor]
+            id_query_obj = {'_id': {'$in': id_list}}
+        else:
+            id_query_obj = None
         self._actual_result_cursor = db[search_coll_name].map_reduce(map_js, reduce_js, 
             query=id_query_obj, scope=scope).find()
         self._actual_result_cursor.sort([('value.score', pymongo.DESCENDING)])
-        if self._limit is not None: #optimise the hell out of this later maybe?
-            self._actual_result_cursor.limit(self._limit)
-        if self._skip is not None:
-            self._actual_result_cursor.skip(self._skip)
         #should we be ensuring an index here? or just leave it?
         # res_coll.ensure_index([('value.score', pymongo.ASCENDING)])
+    
+    def _raw_search(self):
+        map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
+        reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
+        scope =  {'search_terms': self.search_query_terms, 'coll_name': self.collection.name}
+        #   lazily assuming "$all" (i.e. AND search) 
+        query_obj = {'value._extracted_terms': {'$all': self.search_query_terms}}
+        id_list = self.id_list()
+        if id_list is not None:
+            query_obj['_id'] = {'$in': id_list}
+        db = self.collection.database
+        self._raw_result_coll = db[index_name(self.collection)].map_reduce(
+          map_js, reduce_js, scope=scope, query=query_obj)
+        self._raw_result_coll.ensure_index([('value.score', pymongo.ASCENDING)]) 
+        # can't demand backgrounding in python seemingly?
     
     def id_list(self):
         if self._id_list is not None:
             return self._id_list
         elif self._spec is not None:
-            return [rec['_id'] for rec in collection.find(self._spec, ['_id'])]
+            return [rec['_id'] for rec in self.collection.find(self._spec, ['_id'])]
         else:
             return None
         
