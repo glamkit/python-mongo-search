@@ -7,8 +7,8 @@ executing. That is:
 
 search.mapReduceIndex
 search.mapReduceTermScore
+search.mapReduceRawSearch
 search.mapReduceSearch
-search.mapReduceNiceSearch
 search.stemAndTokenize (and thus search.stem and search.tokenizeBasic )
 
 Optional (if you don't mind calling blocking execution server-wide)
@@ -40,14 +40,14 @@ def ensure_text_index(collection):
 
 def raw_search(collection, search_query_string):
     """
-    Re-implmentation of JS function search.mapReduceSearch
+    Re-implmentation of JS function search.mapReduceRawSearch
     """
     #TODO: add in a spec param here - we may as well pre-filter this search too
     # this means we can also then sort the output and just use relevant ones later
     # when we have to do limit etc.
     search_query_terms = process_query_string(search_query_string)
-    map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
-    reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
+    map_js = Code("function() { mft.get('search')._rawSearchMap.call(this) }")
+    reduce_js = Code("function(k, v) { return mft.get('search')._rawSearchReduce(k, v) }")
     scope =  {'search_terms': search_query_terms, 'coll_name': collection.name}
     #   lazily assuming "$all" (i.e. AND search) 
     query_obj = {'value._extracted_terms': {'$all': search_query_terms}}
@@ -64,7 +64,7 @@ def _query_obj_for_terms(search_query_terms):
 def search_by_query(collection, search_query_string, query_obj):
     """
     Search, returning full result sets and limiting by the supplied id_list
-    A re-implementation of the javascript function search.mapReduceNiceSearch.
+    A re-implementation of the javascript function search.mapReduceSearch.
     """
     # because we only have access to the index collection later, we have to convert 
     # the query_obj to an id list
@@ -77,8 +77,8 @@ def search_by_ids(collection, search_query_string, id_list=None):
     """
     raw_search_results = search(collection, search_query_string)
     search_coll_name = raw_search_results.name
-    map_js = Code("function() { mft.get('search')._niceSearchMap.call(this) }")
-    reduce_js = Code("function(k, v) { return mft.get('search')._niceSearchReduce(k, v) }")
+    map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
+    reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
     scope =  {'coll_name': collection.name}
     db = collection.database
     sorting = {'value.score': pymongo.DESCENDING}
@@ -187,8 +187,8 @@ class SearchCursor(object):
     def _perform_search(self):
         self._raw_search()
         search_coll_name = self._raw_result_coll.name
-        map_js = Code("function() { mft.get('search')._niceSearchMap.call(this) }")
-        reduce_js = Code("function(k, v) { return mft.get('search')._niceSearchReduce(k, v) }")
+        map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
+        reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
         scope =  {'coll_name': self.collection.name}
         db = self.collection.database
         # sorting = [('value.score', pymongo.DESCENDING)]    #Seems to not make any difference?
@@ -212,8 +212,8 @@ class SearchCursor(object):
         # res_coll.ensure_index([('value.score', pymongo.ASCENDING)])
     
     def _raw_search(self):
-        map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
-        reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
+        map_js = Code("function() { mft.get('search')._rawSearchMap.call(this) }")
+        reduce_js = Code("function(k, v) { return mft.get('search')._rawSearchReduce(k, v) }")
         scope =  {'search_terms': self.search_query_terms, 'coll_name': self.collection.name}
         #   lazily assuming "$all" (i.e. AND search) 
         query_obj = {'value._extracted_terms': {'$all': self.search_query_terms}}
