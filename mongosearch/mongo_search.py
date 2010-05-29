@@ -25,6 +25,7 @@ import porter
 
 TOKENIZE_BASIC_RE = re.compile(r"\b(\w[\w'-]*\w|\w)\b") #this should match the RE in use on the server
 INDEX_NAMESPACE = 'search_.indexes'
+ 
 
 def ensure_text_index(collection):
     """Execute all relevant bulk indexing functions
@@ -168,7 +169,7 @@ class SearchCursor(object):
     
     def skip(self, skip):
         if self._actual_result_cursor is not None:
-            raise InvalidOperation("Cannot set search options after executing SearchQuery")
+            raise InvalidSearchOperation("Cannot set search options after executing SearchQuery")
         self._skip = skip
         return self
     
@@ -234,4 +235,5 @@ class SearchCursor(object):
             return None
         
         
-        
+class InvalidSearchOperation(pymongo.errors.InvalidOperation):
+    pass
