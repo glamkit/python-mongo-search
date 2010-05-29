@@ -95,7 +95,7 @@ def test_simple_search():
     stdout, stderr = mongo_search.ensure_text_index(collection)
     
     results = mongo_search.search(collection, u'fish')
-
+    
     assert_equals(
       list(results.find()),
       [{u'_id': 1.0, u'value': 0.72150482058559517},
@@ -128,21 +128,52 @@ def test_oo_search():
 
     stdout, stderr = collection.ensure_text_index()
 
-    results = collection._search(u'fish')
-
-    assert_equals(
-      list(results.find()),
-      [{u'_id': 1, u'value': 0.72150482058559517},
-       {u'_id': 3, u'value': 0.32510310522208458}]
-    )
- 
-    cursor_results = list(collection.search(u'fish'))
+    # NO raw search for now
+    # we could do this, but we would want to use a fields param like with .find()
     
-    assert_equals(cursor_results, [
+    # results = collection._search(u'fish')
+    # 
+    # assert_equals(
+    #   list(results.find()),
+    #   [{u'_id': 1, u'value': 0.72150482058559517},
+    #    {u'_id': 3, u'value': 0.32510310522208458}]
+    # )
+ 
+    assert_equals(list(collection.search(u'fish')), [
         {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish', u'category': u'A' },
         {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish', u'category': u'B' }])
         
+    assert_equals(list(collection.search(u'fish', spec={u'category': u'A'})), [
+        {u'content': u'groupers like John Dory', u'_id': 1.0, u'score': 0.72150482058559517, u'title': u'fish', u'category': u'A' }])
         
+    assert_equals(list(collection.search(u'dog whippet', limit=1)), [
+        {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.27585913234480763, u'title': u'dogs and fish', u'category': u'B' }])
+    assert_equals(list(collection.search(u'whippets', skip=1, spec={u'category': u'B'})), [
+        {u'content': u'whippets kick mongrels', u'_id': 2.0, u'score': 0.1706438640480763, u'title': u'dogs', u'category': u'B' }])
+    assert_equals(list(collection.search(u'whippet', spec={u'category': u'Z'})), [])
+    assert_equals(list(collection.search(u'whippet', skip=2, spec={u'category': u'Z'})), [])
+    assert_equals(list(collection.search(u'spurgle', limit=10)), [])
+    
+    cursor = collection.search(u'dog whippet')
+    assert_equals(cursor.count(), 2)
+    cursor.skip(1)
+    cursor.limit(1)
+    assert_equals(cursor[0], 
+        {u'content': u'whippets kick mongrels', u'category': u'B', u'_id': 2, u'score': 0.72398060061762026, u'title': u'dogs'})
+    assert_equals(len(list(cursor)), 1)
+    
+    cursor = collection.search(u'dog')
+    cursor.limit(10)
+    assert_equals(cursor.count(), 2)
+    assert_equals(list(cursor), 
+        [{u'content': u'whippets kick mongrels', u'_id': 2.0, u'score': 0.8532193202403815, u'title': u'dogs', u'category': u'B' },
+        {u'content': u'whippets kick groupers', u'_id': 3.0, u'score': 0.32510310522208458, u'title': u'dogs and fish', u'category': u'B' }])
+ 
+    cursor = collection.search(u'kick', skip=1, limit=5)
+    assert_equals(list(cursor), 
+        [{u'content': u'whippets kick mongrels', u'_id': 2.0, u'score': 0.1706438640480763, u'title': u'dogs', u'category': u'B' }])
+    assert_equals(cursor.count(), 2)
+   
 
 # def test_stemming():
 #     analyze = whoosh_searching.search_engine().index.schema.analyzer('content')
