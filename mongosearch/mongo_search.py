@@ -38,7 +38,7 @@ def ensure_text_index(collection):
       "mft.get('search').mapReduceIndexTheLot('%s');" % collection.name,
       collection.database)
 
-def search(collection, search_query_string):
+def raw_search(collection, search_query_string):
     """
     Re-implmentation of JS function search.mapReduceSearch
     """
@@ -61,7 +61,7 @@ def search(collection, search_query_string):
 def _query_obj_for_terms(search_query_terms):
     return {'value._extracted_terms': {'$all': search_query_terms}}
     
-def nice_search_by_query(collection, search_query_string, query_obj):
+def search_by_query(collection, search_query_string, query_obj):
     """
     Search, returning full result sets and limiting by the supplied id_list
     A re-implementation of the javascript function search.mapReduceNiceSearch.
@@ -69,9 +69,9 @@ def nice_search_by_query(collection, search_query_string, query_obj):
     # because we only have access to the index collection later, we have to convert 
     # the query_obj to an id list
     id_list = [rec['_id'] for rec in collection.find(query_obj, ['_id'])]
-    return nice_search_by_ids(collection, search_query_string, id_list)
+    return search_by_ids(collection, search_query_string, id_list)
 
-def nice_search_by_ids(collection, search_query_string, id_list=None):
+def search_by_ids(collection, search_query_string, id_list=None):
     """
     Search, returning full result sets and limiting by the supplied id_list
     """
@@ -92,8 +92,8 @@ def nice_search_by_ids(collection, search_query_string, id_list=None):
     # res_coll.ensure_index([('value.score', pymongo.ASCENDING)])
     return res_coll.find()
 
-def nice_search(collection, search_query_string):
-    return nice_search_by_ids(collection, search_query_string, None)
+def search(collection, search_query_string):
+    return search_by_ids(collection, search_query_string, None)
     
 def process_query_string(query_string):
     return sorted(stem_and_tokenize(query_string))
