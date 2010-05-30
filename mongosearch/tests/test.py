@@ -86,15 +86,15 @@ def test_simple_search():
     conf.remove()
     conf.insert({
       'collection_name' : 'search_works',
-      'fields': {
-        'title': 5, 'content': 1},
-      'params': {
-        'full_vector_norm': True}
+      'indexes': {
+          '_default': {'fields': {'title': 5, 'content': 1}},
+          'title': {'fields': {'title': 1}}
+      }
     })
     
     stdout, stderr = mongo_search.ensure_text_index(collection)
     
-    results = mongo_search.search(collection, u'fish')
+    results = mongo_search.raw_search(collection, u'fish')
     
     assert_equals(
       list(results.find()),
@@ -102,7 +102,7 @@ def test_simple_search():
        {u'_id': 3.0, u'value': 0.32510310522208458}]
     )
     
-    nice_results = mongo_search.nice_search(collection, u'fish')
+    nice_results = mongo_search.search(collection, u'fish')
 
     assert_equals(
       list(nice_results),
@@ -120,12 +120,12 @@ def test_oo_search():
     conf.remove()
     conf.insert({
       'collection_name' : 'oo_search_works',
-      'fields': {
-        'title': 5, 'content': 1},
-      'params': {
-        'full_vector_norm': True}
+      'indexes': {
+          '_default': {'fields': {'title': 5, 'content': 1}},
+          'title': {'fields': {'title': 1}}
+      }
     })
-
+        
     stdout, stderr = collection.ensure_text_index()
 
     # NO raw search for now

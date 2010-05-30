@@ -38,21 +38,22 @@ def ensure_text_index(collection):
       "mft.get('search').mapReduceIndexTheLot('%s');" % collection.name,
       collection.database)
 
-def raw_search(collection, search_query_string):
+def raw_search(collection, search_query):
     """
     Re-implmentation of JS function search.mapReduceRawSearch
     """
     #TODO: add in a spec param here - we may as well pre-filter this search too
     # this means we can also then sort the output and just use relevant ones later
     # when we have to do limit etc.
-    search_query_terms = process_query_string(search_query_string)
+    search_query_terms = process_query_string(search_query)
+    index_name = '_default' # assuem this for now -this is a legacy interface we can sdelete soon.
     map_js = Code("function() { mft.get('search')._rawSearchMap.call(this) }")
     reduce_js = Code("function(k, v) { return mft.get('search')._rawSearchReduce(k, v) }")
-    scope =  {'search_terms': search_query_terms, 'coll_name': collection.name}
+    scope =  {'search_terms': search_query_terms, 'coll_name': collection.name, 'index_name': index_name}
     #   lazily assuming "$all" (i.e. AND search) 
     query_obj = {'value._extracted_terms': {'$all': search_query_terms}}
     db = collection.database
-    res = db[index_name(collection)].map_reduce(
+    res = db[index_coll_name(collection, index_name)].map_reduce(
       map_js, reduce_js, scope=scope, query=query_obj)
     res.ensure_index([('value.score', pymongo.ASCENDING)]) # can't demand backgrounding in python seemingly?
     # should we be returning a verbose result, or just the collection here?
@@ -75,7 +76,7 @@ def search_by_ids(collection, search_query_string, id_list=None):
     """
     Search, returning full result sets and limiting by the supplied id_list
     """
-    raw_search_results = search(collection, search_query_string)
+    raw_search_results = raw_search(collection, search_query_string)
     search_coll_name = raw_search_results.name
     map_js = Code("function() { mft.get('search')._searchMap.call(this) }")
     reduce_js = Code("function(k, v) { return mft.get('search')._searchReduce(k, v) }")
@@ -112,8 +113,8 @@ def stem(tokens):
 def tokenize(phrase):
     return [m.group(0) for m in TOKENIZE_BASIC_RE.finditer(phrase)]
 
-def index_name(collection):
-    return INDEX_NAMESPACE + '.' + collection.name
+def index_coll_name(collection, index_name):
+    return INDEX_NAMESPACE + '.' + collection.name + '.' + index_name
     
 class SearchableCollection(object):
     """
@@ -131,11 +132,12 @@ class SearchableCollection(object):
 
 
 class SearchCursor(object):
-    def __init__(self, collection, search_query_string, id_list=None, spec=None, limit=0, skip=0):
+    def __init__(self, collection, search_query, id_list=None, spec=None, limit=0, skip=0):
         if id_list and spec:
             raise InvalidSearchOperation("Can't set id_list and spec at the same time")
         self.collection = collection
-        self.search_query_string = search_query_string
+        self.search_query_string = search_query
+        self.search_index_name = '_default' # TODO: should be parsing this out of search_query
         self.search_query_terms = process_query_string(self.search_query_string)
         self._id_list = id_list
         self._spec = spec
@@ -177,10 +179,8 @@ class SearchCursor(object):
         # if we haven't done the query yet, don't do a full search - just minimum to get the count right
         if self._actual_result_cursor is None \
           or self._limit is not None or self.skip is not None:
-            db = self.collection.database
-            index_coll = db[index_name(self.collection)]
             #shoudl refactor this by moving search() inside this cursor, so we can cache this stuff
-            return index_coll.find(_query_obj_for_terms(self.search_query_terms)).count()
+            return self.search_index_collection.find(_query_obj_for_terms(self.search_query_terms)).count()
         else:
             return self._actual_result_cursor.count()
     
@@ -214,14 +214,14 @@ class SearchCursor(object):
     def _raw_search(self):
         map_js = Code("function() { mft.get('search')._rawSearchMap.call(this) }")
         reduce_js = Code("function(k, v) { return mft.get('search')._rawSearchReduce(k, v) }")
-        scope =  {'search_terms': self.search_query_terms, 'coll_name': self.collection.name}
+        scope =  {'search_terms': self.search_query_terms, 'coll_name': self.collection.name, 
+          'index_name': self.search_index_name}
         #   lazily assuming "$all" (i.e. AND search) 
         query_obj = {'value._extracted_terms': {'$all': self.search_query_terms}}
         id_list = self.id_list()
         if id_list is not None:
             query_obj['_id'] = {'$in': id_list}
-        db = self.collection.database
-        self._raw_result_coll = db[index_name(self.collection)].map_reduce(
+        self._raw_result_coll = self.search_index_collection.map_reduce(
           map_js, reduce_js, scope=scope, query=query_obj)
         self._raw_result_coll.ensure_index([('value.score', pymongo.ASCENDING)]) 
         # can't demand backgrounding in python seemingly?
@@ -233,7 +233,12 @@ class SearchCursor(object):
             return [rec['_id'] for rec in self.collection.find(self._spec, ['_id'])]
         else:
             return None
-        
+    
+    @property
+    def search_index_collection(self):
+        db = self.collection.database
+        print "DEBUG: ", index_coll_name(self.collection, self.search_index_name)
+        return db[index_coll_name(self.collection, self.search_index_name)]
         
 class InvalidSearchOperation(pymongo.errors.InvalidOperation):
     pass
