@@ -127,23 +127,47 @@ class SearchableCollection(object):
 
     ensure_text_index = ensure_text_index
     
-    def search(self, search_query_string, spec=None, id_list=None, limit=None, skip=None):
-        return SearchCursor(self, search_query_string, spec=spec, id_list=id_list, limit=limit, skip=skip)
+    def search(self, search_query, spec=None, id_list=None, limit=None, skip=None):
+        """Search for the specified `search_query` in this collection.
+        
+        `search_query` can be a string, which will search in the default index named '_default', or
+        a dictionary, where the key indicates which named index to search in. Currently
+        searching through multiple indexes is not supported.
+        
+        `spec` prefilters the search results with the given query object, operating the same way
+        as the same argument to .find() on a regular cursor.
+        `id_list` is a list of values for `_id` which you want to restric the search to. If you know
+        the id_list already, it is more efficient to supply that than `spec`, as
+        the latter is converted to an id_list behind the scenes to make it compatible with MapReduce.
+        `limit` and `skip` have the same meaning as the arguments to .find()
+        """
+        return SearchCursor(self, search_query, spec=spec, id_list=id_list, limit=limit, skip=skip)
 
 
 class SearchCursor(object):
+    """A cursor to iterate through search results. Should not be instantiated directly, but returned by
+    calling SearchableCollection.search().
+    """
     def __init__(self, collection, search_query, id_list=None, spec=None, limit=0, skip=0):
         if id_list and spec:
             raise InvalidSearchOperation("Can't set id_list and spec at the same time")
         self.collection = collection
-        self.search_query_string = search_query
-        self.search_index_name = '_default' # TODO: should be parsing this out of search_query
+        if isinstance(search_query, dict): #eww, not very pythonic, any ideas here?
+            if len(search_query) > 1 or len(search_query) == 0:
+                raise InvalidSearchOperation("Number of indexes requested must be exactly one")
+            self.search_index_name = search_query.keys()[0]
+            self.search_query_string = search_query[self.search_index_name]
+            #Should we check if it's a valid index here
+        else:
+            self.search_query_string = search_query
+            self.search_index_name = '_default' 
         self.search_query_terms = process_query_string(self.search_query_string)
         self._id_list = id_list
         self._spec = spec
         self._actual_result_cursor = None
         self._limit = limit
         self._skip = skip
+        self._get_search_idx_collection() #throw an error now for invalid index
 
     def _cached_result_cursor(self):
         if self._actual_result_cursor is None:
@@ -163,13 +187,20 @@ class SearchCursor(object):
         return self
     
     def limit(self, limit):
-        # could do much optimising here
+        """Limit the search to supplied number of results.
+        
+        This is useful for pagination. This operated the same way as .limit() on a regular cursor.
+        """
         if self._actual_result_cursor is not None:
             raise InvalidSearchOperation("Cannot set search options after executing SearchQuery")
         self._limit = limit
         return self
     
     def skip(self, skip):
+        """Skip the supplied number of results in the result output
+        
+        This is useful for pagination. This operated the same way as .skip() on a regular cursor.
+        """
         if self._actual_result_cursor is not None:
             raise InvalidSearchOperation("Cannot set search options after executing SearchQuery")
         self._skip = skip
@@ -180,7 +211,7 @@ class SearchCursor(object):
         if self._actual_result_cursor is None \
           or self._limit is not None or self.skip is not None:
             #shoudl refactor this by moving search() inside this cursor, so we can cache this stuff
-            return self.search_index_collection.find(_query_obj_for_terms(self.search_query_terms)).count()
+            return self._get_search_idx_collection().find(_query_obj_for_terms(self.search_query_terms)).count()
         else:
             return self._actual_result_cursor.count()
     
@@ -221,7 +252,7 @@ class SearchCursor(object):
         id_list = self.id_list()
         if id_list is not None:
             query_obj['_id'] = {'$in': id_list}
-        self._raw_result_coll = self.search_index_collection.map_reduce(
+        self._raw_result_coll = self._get_search_idx_collection().map_reduce(
           map_js, reduce_js, scope=scope, query=query_obj)
         self._raw_result_coll.ensure_index([('value.score', pymongo.ASCENDING)]) 
         # can't demand backgrounding in python seemingly?
@@ -234,11 +265,19 @@ class SearchCursor(object):
         else:
             return None
     
-    @property
-    def search_index_collection(self):
+    def _get_search_idx_collection(self):
         db = self.collection.database
-        print "DEBUG: ", index_coll_name(self.collection, self.search_index_name)
-        return db[index_coll_name(self.collection, self.search_index_name)]
+        name_for_index_coll = index_coll_name(self.collection, self.search_index_name)
+        if name_for_index_coll not in db.collection_names():
+            # TODO: this should distinguish between the unindexed case and the missing config item case
+            # would be a simple matter of checking the DB config
+            raise MissingSearchIndexException("Search index '%s' does not exist. This could be because"
+                " the database hasn't been indexed, or because you specified an invalid search index" 
+                " name (you requested '%s')" % (name_for_index_coll, self.search_index_name))
+        return db[name_for_index_coll]
         
 class InvalidSearchOperation(pymongo.errors.InvalidOperation):
+    pass
+    
+class MissingSearchIndexException(InvalidSearchOperation):
     pass
