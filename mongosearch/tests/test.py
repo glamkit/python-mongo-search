@@ -175,6 +175,53 @@ def test_oo_search():
     assert_equals(cursor.count(), 2)
    
 
+
+def test_per_field_search():
+    collection = mongo_search.SearchableCollection(
+      _database['oo_per_field_works']
+    )
+    collection.remove()
+    stdout, stderr = util.load_fixture('jstests/_fixture-per_field.json', collection)
+    conf = _database['fulltext_config']
+    conf.remove()
+    conf.insert({
+      'collection_name' : 'oo_per_field_works',
+      'indexes': {
+          '_default': {'fields': {'title': 5, 'content': 1}},
+          'title': {'fields': {'title': 1}},
+          'content_idx': {'fields': {'content': 1}} # index name needn't match a field name
+      }
+    })
+        
+    stdout, stderr = collection.ensure_text_index()
+
+    assert_equals(list(collection.search(u'dog')), [
+        { u'_id' : 3, u'title' : u'dogs & fish', u'content' : u'whippets kick groupers', u'category': u'B', u'score': 0.68680281974344504  },
+        { u'_id' : 2, u'title' : u'dogs', u'content' : u'whippets kick mongrels and no fish are involved', u'category': u'B', u'score': 0.65447153370732369  },
+        {u'_id' : 1, u'title' : u'fish', u'content' : u'groupers like John Dory are not dogs', u'category': u'A', u'score': 0.13203025163465576 }])
+    
+    assert_equals(list(collection.search(u'dog')), list(collection.search({u'_default': 'dog'})))
+    
+    assert_equals(list(collection.search({u'title': u'dog'})), [    
+        { u'_id' : 2, u'title' : u'dogs', u'content' : u'whippets kick mongrels and no fish are involved', u'category': u'B', u'score': 1  },
+        { u'_id' : 3, u'title' : u'dogs & fish', u'content' : u'whippets kick groupers', u'category': u'B', u'score': 0.7071067811865475  }])
+        
+    assert_equals(list(collection.search({u'content_idx': u'dogs'})),  [{ u'_id' : 1, u'title' : u'fish', u'content' : u'groupers like John Dory are not dogs', u'category': u'A', u'score': 0.1757748711858504 }])
+    
+    assert_equals(list(collection.search({u'title': u'fish'}, {'category': 'B'})), [
+        { u'_id' : 3, u'title' : u'dogs & fish', u'content' : u'whippets kick groupers', u'category': u'B', u'score': 0.7071067811865475  }])
+
+    assert_equals(list(collection.search({u'title': u'fish dog'})), [
+        { u'_id' : 3, u'title' : u'dogs & fish', u'content' : u'whippets kick groupers', u'category': u'B', u'score': 0.99999999999999989 }])
+    
+    assert_equals(list(collection.search({u'title': u'dog'}, spec={u'category': u'Z'})), [])
+    assert_equals(list(collection.search({u'content_idx': u'whippet'}, skip=2, spec={u'category': u'Z'})), [])
+    assert_equals(list(collection.search({u'content_idx': u'spurgle'}, limit=10)), [])
+    assert_equals(list(collection.search({u'title': u'dogs whippet'})), [])
+    
+    assert_raises(mongo_search.MissingSearchIndexException, collection.search, {u'not_index_name': 'dog'})
+   
+
 # def test_stemming():
 #     analyze = whoosh_searching.search_engine().index.schema.analyzer('content')
 #     assert list(analyze(u'finally'))[0].text == u'final' # so porter1 right now
