@@ -26,13 +26,14 @@ import porter
 TOKENIZE_BASIC_RE = re.compile(r"\b(\w[\w'-]*\w|\w)\b") #this should match the RE in use on the server
 INDEX_NAMESPACE = 'search_.indexes'
  
-
 def ensure_text_index(collection):
-    """Execute all relevant bulk indexing functions
+    """
+    Execute all relevant bulk indexing functions
     ie:
-        mapReduceIndex , which extracts indexed terms and puts them in a new collection
+        mapReduceIndex , which extracts indexed terms and puts them in a new
+           collection
         mapReduceTermScore , which creates a table of scores for each term.
-    which is covered by mapReduceIndexTheLot
+          which is covered by mapReduceIndexTheLot
     """
     return util.exec_js_from_string(
       "mft.get('search').mapReduceIndexTheLot('%s');" % collection.name,
@@ -130,23 +131,27 @@ class SearchableCollection(object):
     def search(self, search_query, spec=None, id_list=None, limit=None, skip=None):
         """Search for the specified `search_query` in this collection.
         
-        `search_query` can be a string, which will search in the default index named '_default', or
-        a dictionary, where the key indicates which named index to search in. Currently
-        searching through multiple indexes is not supported.
+        `search_query` can be a string, which will search in the default index
+        named '_default', or a dictionary, where the key indicates which named
+        index to search in. Currently searching through multiple indexes is not
+        supported.
         
-        `spec` prefilters the search results with the given query object, operating the same way
-        as the same argument to .find() on a regular cursor.
-        `id_list` is a list of values for `_id` which you want to restric the search to. If you know
-        the id_list already, it is more efficient to supply that than `spec`, as
-        the latter is converted to an id_list behind the scenes to make it compatible with MapReduce.
+        `spec` prefilters the search results with the given query object,
+        operating the same way as the same argument to .find() on a regular
+        cursor.
+        `id_list` is a list of values for `_id` which you want to restrict the
+        search to. If you know the id_list already, it is more efficient to
+        supply that than `spec`, as the latter is converted to an id_list
+        behind the scenes to make it compatible with MapReduce.
         `limit` and `skip` have the same meaning as the arguments to .find()
         """
         return SearchCursor(self, search_query, spec=spec, id_list=id_list, limit=limit, skip=skip)
 
 
 class SearchCursor(object):
-    """A cursor to iterate through search results. Should not be instantiated directly, but returned by
-    calling SearchableCollection.search().
+    """
+    A cursor to iterate through search results. Should not be instantiated
+    directly, but returned by calling SearchableCollection.search().
     """
     def __init__(self, collection, search_query, id_list=None, spec=None, limit=0, skip=0):
         if id_list and spec:
@@ -154,7 +159,8 @@ class SearchCursor(object):
         self.collection = collection
         if isinstance(search_query, dict): #eww, not very pythonic, any ideas here?
             if len(search_query) > 1 or len(search_query) == 0:
-                raise InvalidSearchOperation("Number of indexes requested must be exactly one")
+                raise InvalidSearchOperation("Number of indexes requested must "
+                  "be exactly one")
             self.search_index_name = search_query.keys()[0]
             self.search_query_string = search_query[self.search_index_name]
             #Should we check if it's a valid index here
@@ -187,22 +193,28 @@ class SearchCursor(object):
         return self
     
     def limit(self, limit):
-        """Limit the search to supplied number of results.
+        """
+        Limit the search to supplied number of results.
         
-        This is useful for pagination. This operated the same way as .limit() on a regular cursor.
+        This is useful for pagination. This operated the same way as .limit() on 
+        a regular cursor.
         """
         if self._actual_result_cursor is not None:
-            raise InvalidSearchOperation("Cannot set search options after executing SearchQuery")
+            raise InvalidSearchOperation("Cannot set search options after"
+             " executing SearchQuery")
         self._limit = limit
         return self
     
     def skip(self, skip):
-        """Skip the supplied number of results in the result output
+        """
+        Skip the supplied number of results in the result output
         
-        This is useful for pagination. This operated the same way as .skip() on a regular cursor.
+        This is useful for pagination. This operated the same way as .skip() on
+        a regular cursor.
         """
         if self._actual_result_cursor is not None:
-            raise InvalidSearchOperation("Cannot set search options after executing SearchQuery")
+            raise InvalidSearchOperation("Cannot set search options after"
+            " executing SearchQuery")
         self._skip = skip
         return self
     
@@ -271,9 +283,10 @@ class SearchCursor(object):
         if name_for_index_coll not in db.collection_names():
             # TODO: this should distinguish between the unindexed case and the missing config item case
             # would be a simple matter of checking the DB config
-            raise MissingSearchIndexException("Search index '%s' does not exist. This could be because"
-                " the database hasn't been indexed, or because you specified an invalid search index" 
-                " name (you requested '%s')" % (name_for_index_coll, self.search_index_name))
+            raise MissingSearchIndexException("Search index '%s' does not "
+              "exist. This could be because the database hasn't been indexed, "
+              "or because you specified an invalid search index. "
+              "name (you requested '%s')" % (name_for_index_coll, self.search_index_name))
         return db[name_for_index_coll]
         
 class InvalidSearchOperation(pymongo.errors.InvalidOperation):
