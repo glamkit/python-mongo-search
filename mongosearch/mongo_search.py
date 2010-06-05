@@ -14,6 +14,9 @@ search.stemAndTokenize (and thus search.stem and search.tokenizeBasic )
 Optional (if you don't mind calling blocking execution server-wide)
 search.processQueryString
 search.encodeQueryString
+
+TODO: provide access to a non-ranked search that searches for matching stems
+in the full-text index
 """
 import re
 
