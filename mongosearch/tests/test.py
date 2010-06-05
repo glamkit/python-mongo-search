@@ -87,7 +87,7 @@ def test_simple_search():
     conf.insert({
       'collection_name' : 'search_works',
       'indexes': {
-          '_default': {'fields': {'title': 5, 'content': 1}},
+          'default_': {'fields': {'title': 5, 'content': 1}},
           'title': {'fields': {'title': 1}}
       }
     })
@@ -121,7 +121,7 @@ def test_oo_search():
     conf.insert({
       'collection_name' : 'oo_search_works',
       'indexes': {
-          '_default': {'fields': {'title': 5, 'content': 1}},
+          'default_': {'fields': {'title': 5, 'content': 1}},
           'title': {'fields': {'title': 1}}
       }
     })
@@ -187,7 +187,7 @@ def test_per_field_search():
     conf.insert({
       'collection_name' : 'oo_per_field_works',
       'indexes': {
-          '_default': {'fields': {'title': 5, 'content': 1}},
+          'default_': {'fields': {'title': 5, 'content': 1}},
           'title': {'fields': {'title': 1}},
           'content_idx': {'fields': {'content': 1}} # index name needn't match a field name
       }
@@ -200,7 +200,7 @@ def test_per_field_search():
         { u'_id' : 2, u'title' : u'dogs', u'content' : u'whippets kick mongrels and no fish are involved', u'category': u'B', u'score': 0.65447153370732369  },
         {u'_id' : 1, u'title' : u'fish', u'content' : u'groupers like John Dory are not dogs', u'category': u'A', u'score': 0.13203025163465576 }])
     
-    assert_equals(list(collection.search(u'dog')), list(collection.search({u'_default': 'dog'})))
+    assert_equals(list(collection.search(u'dog')), list(collection.search({u'default_': 'dog'})))
     
     assert_equals(list(collection.search({u'title': u'dog'})), [    
         { u'_id' : 2, u'title' : u'dogs', u'content' : u'whippets kick mongrels and no fish are involved', u'category': u'B', u'score': 1  },
