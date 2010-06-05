@@ -52,8 +52,7 @@ def _setup_daemon():
 
 def _setup_fixture(connection=None):
     """
-    setup a test collection on a server
-    set up, then index, content.
+    setup, then index, content on a server,
     
     TODO: purge *all* collections from db to avoid clashes
     
