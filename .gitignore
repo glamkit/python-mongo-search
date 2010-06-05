@@ -1,3 +1,4 @@
 *.pyc
 *~
 build/
+mongosearch.egg-info/
