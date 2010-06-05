@@ -50,7 +50,7 @@ def raw_search(collection, search_query):
     # this means we can also then sort the output and just use relevant ones later
     # when we have to do limit etc.
     search_query_terms = process_query_string(search_query)
-    index_name = '_default' # assuem this for now -this is a legacy interface we can sdelete soon.
+    index_name = 'default_' # assuem this for now -this is a legacy interface we can sdelete soon.
     map_js = Code("function() { mft.get('search')._rawSearchMap.call(this) }")
     reduce_js = Code("function(k, v) { return mft.get('search')._rawSearchReduce(k, v) }")
     scope =  {'search_terms': search_query_terms, 'coll_name': collection.name, 'index_name': index_name}
@@ -169,7 +169,7 @@ class SearchCursor(object):
             #Should we check if it's a valid index here
         else:
             self.search_query_string = search_query
-            self.search_index_name = '_default' 
+            self.search_index_name = 'default_' 
         self.search_query_terms = process_query_string(self.search_query_string)
         self._id_list = id_list
         self._spec = spec
