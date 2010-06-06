@@ -81,7 +81,7 @@ def test_simple_search():
     collection = _database['search_works']
     collection.remove()
     stdout, stderr = util.load_fixture('jstests/_fixture-basic.json', collection)
-    conf = _database['fulltext_config']
+    conf = _database['search_.config']
     conf.remove()
     conf.insert({
       'collection_name' : 'search_works',
@@ -115,17 +115,12 @@ def test_oo_search():
     )
     collection.remove()
     stdout, stderr = util.load_fixture('jstests/_fixture-basic.json', collection)
-    conf = _database['fulltext_config']
-    conf.remove()
-    conf.insert({
-      'collection_name' : 'oo_search_works',
-      'indexes': {
-          'default_': {'fields': {'title': 5, 'content': 1}},
-          'title': {'fields': {'title': 1}}
-      }
-    })
-        
+    
+    stdout, stderr = collection.configure_text_index_fields({'title': 5, 'content': 1})
+    stdout, stderr = collection.configure_text_index_fields({'title': 1}, 'title')
+    
     stdout, stderr = collection.ensure_text_index()
+    
 
     # NO raw search for now
     # we could do this, but we would want to use a fields param like with .find()
@@ -181,17 +176,10 @@ def test_per_field_search():
     )
     collection.remove()
     stdout, stderr = util.load_fixture('jstests/_fixture-per_field.json', collection)
-    conf = _database['fulltext_config']
-    conf.remove()
-    conf.insert({
-      'collection_name' : 'oo_per_field_works',
-      'indexes': {
-          'default_': {'fields': {'title': 5, 'content': 1}},
-          'title': {'fields': {'title': 1}},
-          'content_idx': {'fields': {'content': 1}} # index name needn't match a field name
-      }
-    })
-        
+    collection.configure_text_index_fields({'title': 5, 'content': 1})
+    collection.configure_text_index_fields({'title': 1}, 'title')
+    collection.configure_text_index_fields({'content': 1}, 'content_idx')
+         
     stdout, stderr = collection.ensure_text_index()
 
     assert_equals(list(collection.search(u'dog')), [
@@ -218,7 +206,7 @@ def test_per_field_search():
     assert_equals(list(collection.search({u'content_idx': u'spurgle'}, limit=10)), [])
     assert_equals(list(collection.search({u'title': u'dogs whippet'})), [])
     
-    assert_raises(mongo_search.MissingSearchIndexException, collection.search, {u'not_index_name': 'dog'})
+    assert_raises(mongo_search.SearchIndexNotConfiguredException, collection.search, {u'not_index_name': 'dog'})
    
 
 # def test_stemming():
