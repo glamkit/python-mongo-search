@@ -201,13 +201,12 @@ class MongoDaemon(object):
         import time
         import tempfile
         import errno
+        import os.path
         
         if dbpath is self.PRIVATE_TMP_DIR:
             dbpath = tempfile.mkdtemp()
         elif dbpath is self.TEST_DIR:
-            #TODO: find the path prefic in an OS-sensitive version
-            dbpath = '/tmp/mongodbtest'
-            import os
+            dbpath = os.path.join(tempfile.gettempdir(), 'mongo_search_test')
             try:
                 os.makedirs(dbpath)
             except OSError, e:
@@ -259,7 +258,11 @@ class MongoDaemon(object):
             self.daemon.terminate()
         if self.settings['dbpath']:
             import shutil
-            shutil.rmtree(self.settings['dbpath'])
+            import os.path
+            #we need to resolve symlinks to rmtree in the symlinkey OSX tempdirs
+            shutil.rmtree(
+              os.path.realpath(self.settings['dbpath'])
+            )
         
 # //load an array of records into the specified collection
 # util.load_records_from_list = function(record_list, coll_name) {
