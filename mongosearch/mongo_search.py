@@ -25,7 +25,8 @@ import porter
 
 TOKENIZE_BASIC_RE = re.compile(r"\b(\w[\w'-]*\w|\w)\b") #this should match the RE in use on the server
 INDEX_NAMESPACE = 'search_.indexes'
- 
+CONFIG_COLLECTION = 'search_.config'
+DEFAULT_INDEX_NAME = 'default_'
 
 def ensure_text_index(collection):
     """Execute all relevant bulk indexing functions
@@ -38,6 +39,26 @@ def ensure_text_index(collection):
       "mft.get('search').mapReduceIndexTheLot('%s');" % collection.name,
       collection.database)
 
+def configure_text_index_fields(collection, fields, index_name=None):
+    """
+    Configure the text search index named `index_name` on the supplied `collection`.
+    
+    `fields_json` should be dict containing an array
+    with fieldnames as keys and integers as values -- eg:
+        '{content: 1, title: 5}'
+    """
+    if index_name is None:
+        index_name = DEFAULT_INDEX_NAME
+    # fields_json = '{' + ', '.join("%s:%d" % (f, v) for f, v in fields.iteritems()) + '}'
+    fields_bson = pymongo.bson.BSON(fields)
+    # TODO: should maybe jsut put this direct into the DB?
+    # or at least allow a native python object as the field spec?
+    output = util.exec_js_from_string(
+      'mft.get("search").configureSearchIndexFields("%s", %s, "%s");' % 
+        (collection.name, fields_bson, index_name), collection.database)
+    return output
+    
+    
 def raw_search(collection, search_query):
     """
     Re-implmentation of JS function search.mapReduceRawSearch
@@ -46,7 +67,7 @@ def raw_search(collection, search_query):
     # this means we can also then sort the output and just use relevant ones later
     # when we have to do limit etc.
     search_query_terms = process_query_string(search_query)
-    index_name = 'default_' # assuem this for now -this is a legacy interface we can sdelete soon.
+    index_name = DEFAULT_INDEX_NAME # assuem this for now -this is a legacy interface we can sdelete soon.
     map_js = Code("function() { mft.get('search')._rawSearchMap.call(this) }")
     reduce_js = Code("function(k, v) { return mft.get('search')._rawSearchReduce(k, v) }")
     scope =  {'search_terms': search_query_terms, 'coll_name': collection.name, 'index_name': index_name}
@@ -126,11 +147,15 @@ class SearchableCollection(object):
         return getattr(self.collection, att)
 
     ensure_text_index = ensure_text_index
+    configure_text_index_fields = configure_text_index_fields
+    
+    def get_configuration(self):
+        return self.collection.database[CONFIG_COLLECTION].find_one({'collection_name': self.collection.name})
     
     def search(self, search_query, spec=None, id_list=None, limit=None, skip=None):
         """Search for the specified `search_query` in this collection.
         
-        `search_query` can be a string, which will search in the default index named 'default_', or
+        `search_query` can be a string, which will search in the default index named DEFAULT_INDEX_NAME, or
         a dictionary, where the key indicates which named index to search in. Currently
         searching through multiple indexes is not supported.
         
@@ -160,7 +185,7 @@ class SearchCursor(object):
             #Should we check if it's a valid index here
         else:
             self.search_query_string = search_query
-            self.search_index_name = 'default_' 
+            self.search_index_name = DEFAULT_INDEX_NAME 
         self.search_query_terms = process_query_string(self.search_query_string)
         self._id_list = id_list
         self._spec = spec
@@ -269,15 +294,34 @@ class SearchCursor(object):
         db = self.collection.database
         name_for_index_coll = index_coll_name(self.collection, self.search_index_name)
         if name_for_index_coll not in db.collection_names():
+            if self._get_search_idx_config() is None:
+                raise SearchIndexNotConfiguredException("Search index '%s' does not exist"
+                    " as index name '%s' has not been configured" % (
+                    name_for_index_coll, self.search_index_name))
             # TODO: this should distinguish between the unindexed case and the missing config item case
             # would be a simple matter of checking the DB config
-            raise MissingSearchIndexException("Search index '%s' does not exist. This could be because"
-                " the database hasn't been indexed, or because you specified an invalid search index" 
-                " name (you requested '%s')" % (name_for_index_coll, self.search_index_name))
+            raise SearchIndexNotInitializedException("Search index '%s' does not exist because"
+                " the database hasn't been indexed for requested index name '%s'" % (
+                name_for_index_coll, self.search_index_name))
         return db[name_for_index_coll]
+        
+    def _get_search_idx_config(self):
+        all_index_config = self.collection.get_configuration()
+        if not all_index_config:
+            return None
+        try:
+            return all_index_config['indexes'][self.search_index_name]
+        except KeyError:
+            return None
         
 class InvalidSearchOperation(pymongo.errors.InvalidOperation):
     pass
-    
+
 class MissingSearchIndexException(InvalidSearchOperation):
+    pass
+    
+class SearchIndexNotConfiguredException(MissingSearchIndexException):
+    pass
+    
+class SearchIndexNotInitializedException(MissingSearchIndexException):
     pass
