@@ -50,7 +50,9 @@ def configure_text_index_fields(collection, fields, index_name=None):
     
     `fields_json` should be dict containing an array
     with fieldnames as keys and integers as values -- eg:
-        '{content: 1, title: 5}'
+        "{'content': 1, 'title': 5}"
+        
+    re-implementation of the JS function 'search.configureSearchIndexFields'
     """
     if index_name is None:
         index_name = DEFAULT_INDEX_NAME
@@ -64,12 +66,16 @@ def configure_text_index_fields(collection, fields, index_name=None):
         if not isinstance(fieldvalue, int):
             raise InvalidSearchFieldConfiguration("Field value (the keys of the `fields` dict)"
                 "must be integers. You supplied %r of type %s" % (fieldvalue, type(fieldvalue)))
-    fields_bson = pymongo.bson.BSON(fields)
-    # TODO: should maybe jsut put this direct into the DB?
-    output = util.exec_js_from_string(
-      'mft.get("search").configureSearchIndexFields("%s", %s, "%s");' % 
-        (collection.name, fields_bson, index_name), collection.database)
-    return output
+    db = collection.database
+    coll_name_spec = {'collection_name': collection.name}
+    collection_conf = db[CONFIG_COLLECTION].find_one(coll_name_spec);
+    if collection_conf is None:
+        collection_conf = {'collection_name': collection.name}
+    if 'indexes' not in collection_conf: 
+        collection_conf['indexes'] = { }
+    collection_conf['indexes'][index_name] = { }
+    collection_conf['indexes'][index_name]['fields'] = fields
+    db[CONFIG_COLLECTION].update(coll_name_spec, collection_conf, upsert=True);
     
     
 def raw_search(collection, search_query):
@@ -152,7 +158,7 @@ def index_coll_name(collection, index_name):
     
 class SearchableCollection(object):
     """
-    Wrap a pymongo.search_collections.Collection and provide full-text search functions
+    Wrap a pymongo.collections.Collection and provide full-text search functions
     """
     def __init__(self, collection, *args, **kwargs):
         self.search_collection = collection
@@ -338,7 +344,8 @@ class SearchCursor(object):
         except KeyError:
             return None
         
-class InvalidSearchOperation(pymongo.errors.InvalidOperation):
+class InvalidSearchOperation(pymongo.errors.InvalidOperation, Exception):  
+    # (it seems InvalidOperation doesn't subclass Exception)
     pass
 
 class MissingSearchIndexException(InvalidSearchOperation):

@@ -116,8 +116,8 @@ def test_oo_search():
     collection.remove()
     stdout, stderr = util.load_fixture('jstests/_fixture-basic.json', collection)
     
-    stdout, stderr = collection.configure_text_index_fields({'title': 5, 'content': 1})
-    stdout, stderr = collection.configure_text_index_fields({'title': 1}, 'title')
+    collection.configure_text_index_fields({u'title': 5, u'content': 1})
+    collection.configure_text_index_fields({u'title': 1}, u'title')
     
     stdout, stderr = collection.ensure_text_index()
     
