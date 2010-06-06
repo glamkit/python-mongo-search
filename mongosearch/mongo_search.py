@@ -49,10 +49,18 @@ def configure_text_index_fields(collection, fields, index_name=None):
     """
     if index_name is None:
         index_name = DEFAULT_INDEX_NAME
-    # fields_json = '{' + ', '.join("%s:%d" % (f, v) for f, v in fields.iteritems()) + '}'
+    # do some basic validation here, to try and catch errors that might ocur in the JS
+    if not isinstance(fields, dict):
+        raise InvalidSearchFieldConfiguration("Fields must be a dictionary of fieldname/weighting pairs")
+    for fieldname, fieldvalue in fields.iteritems():
+        if not isinstance(fieldname, str) and not isinstance(fieldname, unicode):
+            raise InvalidSearchFieldConfiguration("Field names (the keys of the `fields` dict)"
+                "must be strings or unicode objects. You supplied %r of type %s" % (fieldname, type(fieldname)))
+        if not isinstance(fieldvalue, int):
+            raise InvalidSearchFieldConfiguration("Field value (the keys of the `fields` dict)"
+                "must be integers. You supplied %r of type %s" % (fieldvalue, type(fieldvalue)))
     fields_bson = pymongo.bson.BSON(fields)
     # TODO: should maybe jsut put this direct into the DB?
-    # or at least allow a native python object as the field spec?
     output = util.exec_js_from_string(
       'mft.get("search").configureSearchIndexFields("%s", %s, "%s");' % 
         (collection.name, fields_bson, index_name), collection.database)
@@ -324,4 +332,7 @@ class SearchIndexNotConfiguredException(MissingSearchIndexException):
     pass
     
 class SearchIndexNotInitializedException(MissingSearchIndexException):
+    pass
+
+class InvalidSearchFieldConfiguration(InvalidSearchOperation):
     pass
