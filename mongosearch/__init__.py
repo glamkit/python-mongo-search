@@ -33,3 +33,4 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 __author__ = 'Andy and Dan MacKinlay <fillmewithspam@email.possumpalace.org>'
+__version__ = 0.1
