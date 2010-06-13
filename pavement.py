@@ -50,14 +50,10 @@ classifiers = [
 install_requires = [
     # -*- Install requires: -*-
     'setuptools',
-    'pymongo >= 1.6'
-    ]
-
-build_requires = [
-    # -*- Install requires: -*-
-    'setuptools',
+    'pymongo >= 1.6',
     'GitPython >= 0.2.0-beta1'
     ]
+
 
 entry_points="""
     # -*- Entry points: -*-
