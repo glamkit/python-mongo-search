@@ -48,7 +48,7 @@ def configure_text_index_fields(collection, fields, index_name=None):
     """
     Configure the text search index named `index_name` on the supplied `collection`.
     
-    `fields_json` should be dict containing an array
+    `fields_json` should be dict
     with fieldnames as keys and integers as values -- eg:
         "{'content': 1, 'title': 5}"
         

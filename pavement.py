@@ -4,6 +4,9 @@ from paver import setuputils
 #from distutils.core import setup
 from setuptools import find_packages
 from paver.setuputils import setup
+#see http://docs.python.org/distutils/extending.html#integrating-new-commands
+from distutils.command.build_py import build_py as _build_py
+from distutils import log
 
 PROJECT = 'mongosearch'
 
@@ -50,12 +53,68 @@ install_requires = [
     'pymongo >= 1.6'
     ]
 
+build_requires = [
+    # -*- Install requires: -*-
+    'setuptools',
+    'GitPython >= 0.2.0-beta1'
+    ]
+
 entry_points="""
     # -*- Entry points: -*-
     """
 
-# compatible with distutils of python 2.3+ or later
+
+class build_py(_build_py, object):
+    """
+    git-submodule-happy Python source builder.
+    
+    We inherit from object to make sur the `super` call works
+    """
+    
+    git_submodules = ['mongosearch/javascript']
+    
+    def run(self, *args, **kwargs):
+        """
+        we hack the normal build to force the git submodule to be updated.
+        """
+        self.ensure_submodules()
+        super(build_py, self).run(*args, **kwargs)
+        
+    def ensure_submodules(self, *args, **kwargs):
+        """
+        given the defined list of submodules in `self.gitsubmodules`,
+        ensure they are all checked out. (simplistic style - simply checks for
+        any non-hidden files using `glob`.)
+        """
+        import os
+        from glob import glob
+        from distutils.util import convert_path
+        missing_submodule = False
+        for submodule_path in self.git_submodules:
+            file_list = glob(convert_path(
+              os.path.join(submodule_path, '*')
+            ))
+            if len(file_list) : continue
+            log.debug('missing submodule %s' % submodule_path)
+            missing_submodule = True
+        if missing_submodule:
+            self.update_submodules()
+
+    def update_submodules(self, *args, **kwargs):
+        """
+        actually do submodule updating.
+        separate functnion call so we can isolate teh GitPython import
+        
+        Tested with git.__version__=='0.2.0-beta1'
+        """
+        import git
+        
+        repo = git.Git('.')
+        repo.submodule('init')
+        repo.submodule('update')
+
 setup(
+    cmdclass={'build_py': build_py},
     name=PROJECT,
     version=version,
     description='Full text search for mongo in javascript, with python client driver',
